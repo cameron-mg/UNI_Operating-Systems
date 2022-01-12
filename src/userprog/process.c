@@ -102,12 +102,14 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
+  /* Cameron Mackay-Grant */
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
+
   pd = cur->pagedir;
   if (pd != NULL) 
     {
+
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
@@ -115,10 +117,14 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+
+  printf("%s: exit(%d)\n", cur->name, cur->exit_code);
+
 }
 
 /* Sets up the CPU for running user code in the current
@@ -443,7 +449,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) {
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE-12;
       } else
         palloc_free_page (kpage);
     }
