@@ -98,6 +98,11 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    bool is_user; //True if the current thread is for a user program
+    struct thread *parent; //Stores parent thread
+    struct list children; //Stores child process list
+    struct file *exec; // Stores file the current thread is executing
+    struct list files; //Stores files for specific thread
 #endif
 
     /* Owned by thread.c. */

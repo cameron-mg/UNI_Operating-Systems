@@ -17,32 +17,98 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
+//Structures
+enum load_status{
+	LOAD_SUCCESS, //File has been loaded successfully
+	LOAD_FAILED, //File has not been loaded successfully
+	NOT_LOADED //File is currently waiting to load
+};
+struct process 
+{
+	pid_t pid; //Stores process ID
+	struct list_elem elem; //List element for child processes
+	bool waiting; //True if process if being waited for
+	bool exited; //True if process has exited
+	enum load_status load_status; //Stores load status of current proc
+	int exit_code; //Stores exit code of process
+	struct semaphore wait; //Used for synchronization, waiting for exit
+	struct semaphore load; //^^, waiting for executing file to load
+	const char* cmdline; //Stores given command line from user
+	struct thread *parent //Stores parent thread of process
+};
+
+//Functions
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static void push_args (const char *[], int count, void **esp);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
+
 tid_t
-process_execute (const char *file_name) 
+process_execute (const char *cmdline) 
 {
-  char *fn_copy;
+  char *cmd_copy;
   tid_t tid;
+  char *filename;
+  char *save_ptr = NULL;
+  struct process *proc = NULL;
+  struct thread *th;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
-    return TID_ERROR;
-  strlcpy (fn_copy, file_name, PGSIZE);
+
+  cmd_copy = palloc_get_page (0);
+  if (cmd_copy == NULL)
+	return TID_ERROR;
+ 
+  strlcpy (cmd_copy, cmdline, PGSIZE);
+
+  //Extract filename from the commmand lne
+  filename = strtok_r(cmd_copy, " ", &save_ptr);
+
+  //Testing statements
+  printf("Filename%s\n", filename);
+
+  //Initialising proc info
+  proc->pid = 0;
+  proc->parent = thread_current();
+  proc->cmdline = cmd_copy;
+  proc->waiting = false;
+  proc->exited = false;
+  proc->exit_code = -1;
+
+  sema_init(&proc->load, 0);
+  sema_init(&proc->wait, 0);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (filename, PRI_DEFAULT, start_process, proc);
 
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (cmd_copy); 
+
+  if (proc == NULL)
+  {
+	  palloc_free_page (cmd_copy);
+	  return -1;
+  }
+
+  th = thread_current;
+
+  //Add process to child list of thread
+  list_push_back (&th->children, &proc->elem);
+
+  //Synch for load
+  sema_down (&proc->load);
+
+  //Check to confirm process has loaded
+  if (proc->load_status == LOAD_FAILED)
+	  return -1;
+
   return tid;
 }
 
