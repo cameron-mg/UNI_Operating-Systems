@@ -160,7 +160,7 @@ start_process (void *proc_)
   if (success)
   {
 	update_load_status(th, success ? LOAD_SUCCESS : LOAD_FAILED);
-	//push_args (argtoks, count, &if_.esp);
+	push_args (argtoks, count, &if_.esp);
   }
   
   palloc_free_page(argtoks);
@@ -619,3 +619,32 @@ struct process *get_child (struct thread *th, tid_t child_tid)
 	//If we cannot find the child return NULL
 	return NULL;
 }
+
+//Argument/stack handling
+static void push_args (const char *argtoks[], int argc, void **esp)
+{
+	//Make sure the argument count given is above zero
+	ASSERT(argc > 0);
+
+	//Declare variables
+	int i = 0;
+	int length = 0;
+	void* argvs[argc];
+
+	//Loop through the array of arguments and decrement the stack pointer
+	//also adding the pointer locations of each to the argv array
+	for (i = 0; i < argc; i++)
+	{
+		//set length to the length of argument i
+		length = strlen(argtoks[i]) + 1;
+
+		//decrement stack pointer by length
+		*esp -= length;
+
+		memcpy(*esp, argtoks[i], length);
+
+		//add the pointer location to the argv array
+		argvs[i] = *esp;
+	}
+}
+
