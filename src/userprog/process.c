@@ -25,6 +25,7 @@ enum load_status{
 	LOAD_FAILED, //File has not been loaded successfully
 	NOT_LOADED //File is currently waiting to load
 };
+
 struct process 
 {
 	pid_t pid; //Stores process ID
@@ -43,6 +44,8 @@ struct process
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 static void push_args (const char *[], int count, void **esp);
+void update_load_status (struct thread *child, enum load_status status);
+struct process *get_child (struct thread *, tid_t);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -97,7 +100,7 @@ process_execute (const char *cmdline)
 	  return -1;
   }
 
-  th = thread_current;
+  th = thread_current();
 
   //Add process to child list of thread
   list_push_back (&th->children, &proc->elem);
@@ -115,11 +118,34 @@ process_execute (const char *cmdline)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void *proc_)
 {
-  char *file_name = file_name_;
+  //Initialize variables and structures
   struct intr_frame if_;
   bool success;
+  struct process *proc = proc_;
+  struct thread *th = thread_current();
+  char *filename = (char*) proc->cmdline;
+  char *token;
+  char *save_ptr;
+  int count = 0;
+
+  //Argument tokenization
+  const char **argtoks = (const char**) palloc_get_page(0);
+
+  //Check we have memory for the argument array
+  if (argtoks == NULL)
+  {
+	  printf("Command line failed");
+	  thread_exit();
+  }
+
+  //Looping through arguments and saving into array
+  for (token = strtok_r(filename, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+  {
+	  count++;
+	  argtoks[count] = token;
+  }
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -127,10 +153,19 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
 
-  success = load (file_name, &if_.eip, &if_.esp);
+  //Load the file
+  success = load (filename, &if_.eip, &if_.esp);
+
+  //If successfully loaded add arguments to the stack and update load status
+  if (success)
+  {
+	update_load_status(th, success ? LOAD_SUCCESS : LOAD_FAILED);
+	//push_args (argtoks, count, &if_.esp);
+  }
   
+  palloc_free_page(argtoks);
+
   /* If load failed, quit. */
-  palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
 
@@ -543,3 +578,44 @@ install_page (void *upage, void *kpage, bool writable)
 }
 
 //--------------------------------------------------------------------
+//Added functions for argument passing:
+//Function to update the load status of a specific process
+void update_load_status (struct thread *child, enum load_status status)
+{
+	//Get the child process
+	struct process *proc = get_child (child->parent, child->tid);
+
+	//Check process has a value
+	if (proc == NULL)
+		return;
+
+	//Set the processes load status and update the load semaphore
+	proc->load_status = status;
+	sema_up (&proc->load);
+}
+
+//Structure to return the child of a specific thread
+struct process *get_child (struct thread *th, tid_t child_tid)
+{
+	struct list_elem *el;
+	struct process *proc;
+
+	//Check given thread is not null value
+	if (th == NULL)
+		return NULL;
+
+	//Loop through list to find child
+	for (el = list_begin (&th->children); el != list_end (&th->children); el = list_next (el))
+	{
+		//Set the process to the current entry
+		proc = list_entry (el, struct process, elem);
+
+		//Check if the process id matches that of the child
+		if (proc->pid == (pid_t) child_tid)
+			return proc;
+
+	}
+
+	//If we cannot find the child return NULL
+	return NULL;
+}
