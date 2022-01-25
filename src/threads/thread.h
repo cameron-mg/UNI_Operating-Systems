@@ -100,7 +100,7 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
     struct thread *parent; //Stores parent thread
     struct list children; //Stores child process list
-    const char *filename; //Stores the filename the thread is executing
+    char *filename; //Stores the filename the thread is executing
 #endif
 
     /* Owned by thread.c. */
