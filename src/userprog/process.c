@@ -37,6 +37,7 @@ struct process
 	struct semaphore wait; //Used for synchronization, waiting for exit
 	struct semaphore load; //^^, waiting for executing file to load
 	const char* cmdline; //Stores given command line from user
+	char* filename; //Stores the filename the process is executing
 	struct thread *parent //Stores parent thread of process
 };
 
@@ -85,6 +86,7 @@ process_execute (const char *cmdline)
   proc->exited = false;
   proc->exit_code = -1;
   proc->load_status = NOT_LOADED;
+  proc->filename = filename;
 
   sema_init(&proc->load, 0);
   sema_init(&proc->wait, 0);
@@ -126,7 +128,8 @@ start_process (void *proc_)
   bool success;
   struct process *proc = proc_; //Copy of process passed to start_process
   struct thread *th = thread_current();
-  char *filename = (char*) proc->cmdline;
+  char *cmdline = (char*) proc->cmdline;
+  char *filename = proc->filename; //Sets filename to one stored in process struct
   char *token; //Stores each arg token used to push args to stack
   char *save_ptr; //Used for strtok_r function
   int count = 0; //Used to store argc
@@ -142,7 +145,7 @@ start_process (void *proc_)
   }
 
   //Looping through arguments and saving into array
-  for (token = strtok_r(filename, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+  for (token = strtok_r(cmdline, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
   {
 	  count++;
 	  argtoks[count] = token;
