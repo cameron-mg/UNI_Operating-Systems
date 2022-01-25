@@ -688,5 +688,11 @@ static void push_args (const char *argtoks[], int argc, void **esp)
 	*esp -= 4;
 	//Set the value at stack pointer to argc
 	*((int*) *esp) = argc;
+
+	//Adding return address to stack
+	//Go to next chunk
+	*esp -= 4;
+	//Set the value at the stack pointer to 0 to indicate return
+	*((int*) *esp) = 0;
 }
 
