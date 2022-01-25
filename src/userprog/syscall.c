@@ -12,6 +12,8 @@
 #include "threads/vaddr.h"
 
 //definitions for argument codes
+//stores the value that will be added to the stack pointer depending on which
+//system call is used
 #define ARG_CODE 0
 #define ARG_0 4
 #define ARG_1 8
@@ -81,7 +83,8 @@ syscall_handler (struct intr_frame *itrf)
 
 static uint32_t loadStack(struct intr_frame *itrf, int store)
 {
-	//itrf points to stack pointer	
+	//returns a 32-bit stack pointer plus the ARG_CODE value (0,4,8,12)
+	//pointer to by the interrupt frame	
 	return *((uint32_t *) (itrf->esp + store));
 }
 
