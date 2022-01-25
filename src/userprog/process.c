@@ -123,12 +123,12 @@ start_process (void *proc_)
   //Initialize variables and structures
   struct intr_frame if_;
   bool success;
-  struct process *proc = proc_;
+  struct process *proc = proc_; //Copy of process passed to start_process
   struct thread *th = thread_current();
   char *filename = (char*) proc->cmdline;
-  char *token;
-  char *save_ptr;
-  int count = 0;
+  char *token; //Stores each arg token used to push args to stack
+  char *save_ptr; //Used for strtok_r function
+  int count = 0; //Used to store argc
 
   //Argument tokenization
   const char **argtoks = (const char**) palloc_get_page(0);

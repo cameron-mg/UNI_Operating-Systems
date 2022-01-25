@@ -3,6 +3,7 @@
 
 #include "threads/thread.h"
 
+//Variable type used to store process ID
 typedef int pid_t;
 
 tid_t process_execute (const char *file_name);
