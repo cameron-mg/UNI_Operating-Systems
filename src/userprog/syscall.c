@@ -22,6 +22,8 @@
 //declaration of the loadStack function
 static uint32_t loadStack (struct intr_frame *itrf, int);
 
+static struct semaphore *fileLock;
+
 //declaration of the syscall handler
 static void syscall_handler (struct intr_frame *itrf);
 
@@ -37,11 +39,20 @@ void sys_halt (void);
 pid_t sys_exec (const char *cmd_line);
 // sys_exec declaration
 
+bool sys_remove (const char *f);
+// sys_remove declaration
+
+bool sys_create (const char *n, unsigned int size);
+//  sys_create declaration
+
 
 void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+  sema_init (&fileLock, 1);
+  //initialises the semaphore. 
+
 }
 
 // Controls the system calls cases 
@@ -77,6 +88,19 @@ syscall_handler (struct intr_frame *itrf)
 		itrf->eax = sys_exec ((const char *) loadStack (itrf, ARG_0));
 		printf("System Execute Call!");
 		break;
+
+
+	//creation of SYS_REMOVE system call case state
+	case SYS_REMOVE:
+		itrf->eax = sys_remove ((const char *) loadStack (itrf, ARG_0));
+		break;
+	
+	//creation of SYS_CREATE system call case state
+	case SYS_CREATE:
+		itrf->eax = sys_create ((const char *) loadStack (itrf	, ARG_0),
+		(unsigned int) loadStack (itrf, ARG_1));
+		break;
+
 	}
   thread_exit ();
 }
@@ -114,4 +138,30 @@ void sys_halt (void)
 pid_t sys_exec (const char *cmd_line)
 {
 	return process_execute (cmd_line);
+}
+
+
+// The function for sys_remove removes a name from the file system
+bool
+sys_remove (const char *filename)
+{
+	bool complete;
+	sema_down (&fileLock); 
+	//when sema down is called it locks the file so other system call cannot access it
+	complete = filesys_remove (filename); //removes the given file
+	sema_up (&fileLock); //sema_up on fileLock indicates the file is avaliable again
+	return complete;
+}
+
+// the function for sys_create creates new files and returns whether they are
+// true or false
+
+bool
+sys_create (const char *filename, unsigned int size)
+{
+	bool complete;
+	sema_down (&fileLock); //Locks the file
+	complete = filesys_create (filename, size); //creates the file with a name and size
+	sema_up (&fileLock); //Unlocks the file
+	return complete;
 }
