@@ -245,6 +245,9 @@ process_exit (void)
   //elsewhere
   if (cur->exit_code == NULL)
 	  cur->exit_code = -1;
+
+  if (cur->exit_code = -1)
+	  printf("Exit code not set");
   
   //Print the name and exit_code of the process that exits
   printf("%s: exit(%d)\n", cur->name, cur->exit_code);
