@@ -156,13 +156,18 @@ start_process (void *proc_)
   //Load the file
   success = load (filename, &if_.eip, &if_.esp);
 
-  //If successfully loaded add arguments to the stack and update load status
+  //If successfully loaded add arguments to the stack and update stack
   if (success)
   {
+	//Update load_status of current thread with SUCCESS or FAILED
 	update_load_status(th, success ? LOAD_SUCCESS : LOAD_FAILED);
+	
+	//Add arguments to the stack passing the array of tokenized arguments,
+	//the amount of arguments and the current stack pointer
 	push_args (argtoks, count, &if_.esp);
   }
   
+  //Free the memory page holding the tokens now they have been passed to stack
   palloc_free_page(argtoks);
 
   /* If load failed, quit. */
@@ -239,6 +244,8 @@ process_exit (void)
   //elsewhere
   if (cur->exit_code == NULL)
 	  cur->exit_code = -1;
+  
+  //Print the name and exit_code of the process that exits
   printf("%s: exit(%d)\n", cur->name, cur->exit_code);
 
 }
@@ -339,8 +346,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
   off_t file_ofs;
-  bool success = false;
-  int i;
+  bool success = false; //Stores true if the executable successfully loads
+  int i; //Counter
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -351,6 +358,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. */
   file = filesys_open (file_name);
 
+  //Check file is not a NULL value
   if (file == NULL) 
     {
 	printf ("load: %s: open failed\n", file_name);
@@ -441,6 +449,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  //When success is returned the arguments are pushed to the stack in the
+  //start_process function.
   return success;
 }
 
@@ -661,5 +671,22 @@ static void push_args (const char *argtoks[], int argc, void **esp)
 		//add the pointer location to the argv array
 		argvs[i] = *esp;
 	}
+
+	//Loop through the argv array backwards and set the stack pointer to the
+	//address held in the array
+	for (i = argc - 1; i >= 0; i--)
+	{
+		//Set stack pointer to start of next chunk
+		*esp -= 4;
+
+		//Set esp to address of argument held in argvs array
+		*((void**) *esp) = argvs[i];
+	}
+
+	//Adding argument count to the stack
+	//Go to next memory chunk
+	*esp -= 4;
+	//Set the value at stack pointer to argc
+	*((int*) *esp) = argc;
 }
 
