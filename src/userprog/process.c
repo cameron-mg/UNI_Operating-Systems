@@ -235,6 +235,10 @@ process_exit (void)
       pagedir_destroy (pd);
     }
 
+  //Giving exit code a value of -1 if it is a NULL value and has not been set
+  //elsewhere
+  if (cur->exit_code == NULL)
+	  cur->exit_code = -1;
   printf("%s: exit(%d)\n", cur->name, cur->exit_code);
 
 }
