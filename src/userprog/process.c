@@ -166,6 +166,9 @@ start_process (void *proc_)
 	//Update load_status of current thread with SUCCESS or FAILED
 	update_load_status(th, success ? LOAD_SUCCESS : LOAD_FAILED);
 	
+	//Sets the loaded filename for the current thread
+	th->filename = filename;
+	
 	//Add arguments to the stack passing the array of tokenized arguments,
 	//the amount of arguments and the current stack pointer
 	push_args (argtoks, count, &if_.esp);
