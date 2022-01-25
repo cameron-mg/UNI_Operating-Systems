@@ -84,6 +84,7 @@ process_execute (const char *cmdline)
   proc->waiting = false;
   proc->exited = false;
   proc->exit_code = -1;
+  proc->load_status = NOT_LOADED;
 
   sema_init(&proc->load, 0);
   sema_init(&proc->wait, 0);
