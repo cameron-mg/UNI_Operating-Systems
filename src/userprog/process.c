@@ -189,12 +189,23 @@ start_process (void *proc_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-    // FIXME: @bgaster --- quick hack to make sure processes execute!
-  for(;;) ;
-    
-  return -1;
+    //Structures and variables
+    int exit_code;
+    struct thread *th = thread_current();
+    struct process *proc = get_child (th, child_tid);
+
+    //Set process wait status to true and set its semaphore
+    sema_down (&proc->wait);
+    proc->waiting = true;
+
+    //Remove the child process from the list element
+    list_remove (&proc->elem);
+
+    //Set the processes exit_code and return
+    exit_code = proc->exit_code;
+    return exit_code;
 }
 
 /* Free the current process's resources. */
@@ -550,7 +561,7 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) {
-        *esp = PHYS_BASE-12;
+        *esp = PHYS_BASE;
       } else
         palloc_free_page (kpage);
     }
@@ -597,8 +608,8 @@ void update_load_status (struct thread *child, enum load_status status)
 //Structure to return the child of a specific thread
 struct process *get_child (struct thread *th, tid_t child_tid)
 {
-	struct list_elem *el;
-	struct process *proc;
+	struct list_elem *el; //List element for child processes
+	struct process *proc; //Stores the child process after it is found
 
 	//Check given thread is not null value
 	if (th == NULL)
