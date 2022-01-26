@@ -124,8 +124,12 @@ process_wait (tid_t child_tid)
     //Structures and variables
     int exit_code = 0;
     
+    //Get current thread
     struct thread *th = thread_current(); //Finding current thread
-    
+   
+    //Set thread wait status
+    th->is_waiting = true;
+
     //Setting exit code
     exit_code = th->exit_code;
 

@@ -101,6 +101,7 @@ struct thread
     struct thread *parent; //Stores parent thread
     struct list children; //Stores child process list
     char *filename; //Stores the filename the thread is executing
+    bool is_waiting; //True if the current thread is waiting
 #endif
 
     /* Owned by thread.c. */
