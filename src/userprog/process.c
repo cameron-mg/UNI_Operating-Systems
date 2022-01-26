@@ -19,34 +19,9 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 
-//Structures
-enum load_status{
-	LOAD_SUCCESS, //File has been loaded successfully
-	LOAD_FAILED, //File has not been loaded successfully
-	NOT_LOADED //File is currently waiting to load
-};
-
-struct process 
-{
-	pid_t pid; //Stores process ID
-	struct list_elem elem; //List element for child processes
-	bool waiting; //True if process if being waited for
-	bool exited; //True if process has exited
-	enum load_status load_status; //Stores load status of current proc
-	int exit_code; //Stores exit code of process
-	struct semaphore wait; //Used for synchronization, waiting for exit
-	struct semaphore load; //^^, waiting for executing file to load
-	const char* cmdline; //Stores given command line from user
-	char* filename; //Stores the filename the process is executing
-	struct thread *parent //Stores parent thread of process
-};
-
 //Functions
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-//static void push_args (const char *[], int count, void **esp);
-void update_load_status (struct thread *child, enum load_status status);
-struct process *get_child (struct thread *, tid_t);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -60,8 +35,6 @@ process_execute (const char *cmdline)
   tid_t tid;
   char *filename;
   char *save_ptr = NULL;
-  struct process *proc = NULL;
-  struct thread *th;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -77,46 +50,13 @@ process_execute (const char *cmdline)
 
   //Testing statements
   printf("Filename: %s\n", filename);
-  printf("Args: %s\n", &save_ptr);
+  printf("Args: %s\n", save_ptr);
 
-  //Initialising proc info
-  //proc->pid = 0;
-  proc->parent = thread_current();
-  proc->cmdline = cmd_copy;
-  proc->waiting = false;
-  proc->exited = false;
-  proc->exit_code = -1;
-  proc->load_status = NOT_LOADED;
-  proc->filename = filename;
-
-  sema_init(&proc->load, 0);
-  sema_init(&proc->wait, 0);
-
-  printf("Process structure instantiated!");
-
-  /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (filename, PRI_DEFAULT, start_process, proc);
+    /* Create a new thread to execute FILE_NAME. */
+  tid = thread_create (filename, PRI_DEFAULT, start_process, cmd_copy);
 
   if (tid == TID_ERROR)
-    palloc_free_page (cmd_copy); 
-
-  if (proc == NULL)
-  {
-	  palloc_free_page (cmd_copy);
-	  return -1;
-  }
-
-  th = thread_current();
-
-  //Add process to child list of thread
-  list_push_back (&th->children, &proc->elem);
-
-  //Synch for load
-  sema_down (&proc->load);
-
-  //Check to confirm process has loaded
-  if (proc->load_status == LOAD_FAILED)
-	  return -1;
+    palloc_free_page (cmd_copy);
 
   return tid;
 }
@@ -129,10 +69,10 @@ start_process (void *proc_)
   //Initialize variables and structures
   struct intr_frame if_;
   bool success;
-  struct process *proc = proc_; //Copy of process passed to start_process
+  char *save_ptr;
   struct thread *th = thread_current();
-  char *cmdline = (char*) proc->cmdline;
-  char *filename = proc->filename; //Sets filename to one stored in process struct
+  char *cmdline = proc_; //Data passed to function
+  char *filename = strtok_r(cmdline, " ", &save_ptr);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -149,11 +89,7 @@ start_process (void *proc_)
   //If successfully loaded add arguments to the stack and update stack
   if (success)
   {
-	//Update load_status of current thread with SUCCESS or FAILED
-	//update_load_status(th, success ? LOAD_SUCCESS : LOAD_FAILED);
-	
-	//Sets the loaded filename for the current thread
-	//th->filename = filename;
+	printf("File loaded successfully!");
   }
   
   //Free the memory page holding the tokens now they have been passed to stack
@@ -186,19 +122,12 @@ int
 process_wait (tid_t child_tid) 
 {
     //Structures and variables
-    int exit_code;
+    int exit_code = 0;
+    
     struct thread *th = thread_current();
-    struct process *proc = get_child (th, child_tid);
+    
+    exit_code = th->exit_code;
 
-    //Set process wait status to true and set its semaphore
-    sema_down (&proc->wait);
-    proc->waiting = true;
-
-    //Remove the child process from the list element
-    list_remove (&proc->elem);
-
-    //Set the processes exit_code and return
-    exit_code = proc->exit_code;
     return exit_code;
 }
 
@@ -669,44 +598,3 @@ install_page (void *upage, void *kpage, bool writable)
 }
 
 //--------------------------------------------------------------------
-//Added functions for argument passing:
-//Function to update the load status of a specific process
-void update_load_status (struct thread *child, enum load_status status)
-{
-	//Get the child process
-	struct process *proc = get_child (child->parent, child->tid);
-
-	//Check process has a value
-	if (proc == NULL)
-		return;
-
-	//Set the processes load status and update the load semaphore
-	proc->load_status = status;
-	sema_up (&proc->load);
-}
-
-//Structure to return the child of a specific thread
-struct process *get_child (struct thread *th, tid_t child_tid)
-{
-	struct list_elem *el; //List element for child processes
-	struct process *proc; //Stores the child process after it is found
-
-	//Check given thread is not null value
-	if (th == NULL)
-		return NULL;
-
-	//Loop through list to find child
-	for (el = list_begin (&th->children); el != list_end (&th->children); el = list_next (el))
-	{
-		//Set the process to the current entry
-		proc = list_entry (el, struct process, elem);
-
-		//Check if the process id matches that of the child
-		if (proc->pid == (pid_t) child_tid)
-			return proc;
-
-	}
-
-	//If we cannot find the child return NULL
-	return NULL;
-}
