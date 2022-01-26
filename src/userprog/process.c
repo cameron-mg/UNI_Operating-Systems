@@ -80,7 +80,7 @@ process_execute (const char *cmdline)
   printf("Args: %s\n", &save_ptr);
 
   //Initialising proc info
-  proc->pid = 0;
+  //proc->pid = 0;
   proc->parent = thread_current();
   proc->cmdline = cmd_copy;
   proc->waiting = false;
@@ -91,6 +91,8 @@ process_execute (const char *cmdline)
 
   sema_init(&proc->load, 0);
   sema_init(&proc->wait, 0);
+
+  printf("Process structure instantiated!");
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (filename, PRI_DEFAULT, start_process, proc);
