@@ -76,7 +76,8 @@ process_execute (const char *cmdline)
   filename = strtok_r(cmd_copy, " ", &save_ptr);
 
   //Testing statements
-  printf("Filename%s\n", filename);
+  printf("Filename: %s\n", filename);
+  printf("Args: %s\n", &save_ptr);
 
   //Initialising proc info
   proc->pid = 0;
@@ -130,14 +131,15 @@ start_process (void *proc_)
   struct thread *th = thread_current();
   char *cmdline = (char*) proc->cmdline;
   char *filename = proc->filename; //Sets filename to one stored in process struct
-  //char *token; //Stores each arg token used to push args to stack
-  //char *save_ptr; //Used for strtok_r function
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
+  //Debug
+  printf("Loading file!");
 
   //Load the file
   success = load (cmdline, &if_.eip, &if_.esp);
@@ -146,10 +148,10 @@ start_process (void *proc_)
   if (success)
   {
 	//Update load_status of current thread with SUCCESS or FAILED
-	update_load_status(th, success ? LOAD_SUCCESS : LOAD_FAILED);
+	//update_load_status(th, success ? LOAD_SUCCESS : LOAD_FAILED);
 	
 	//Sets the loaded filename for the current thread
-	th->filename = filename;
+	//th->filename = filename;
   }
   
   //Free the memory page holding the tokens now they have been passed to stack
@@ -231,7 +233,7 @@ process_exit (void)
 	  cur->exit_code = -1;
 
   if (cur->exit_code == -1)
-	  printf("Exit code not set");
+	  printf("Exit code not set\n");
   
   //Print the name and exit_code of the process that exits
   printf("%s: exit(%d)\n", cur->name, cur->exit_code);
