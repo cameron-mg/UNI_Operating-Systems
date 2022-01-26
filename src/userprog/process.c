@@ -281,19 +281,13 @@ bool load (const char *cmdline, void (**eip) (void), void **esp)
   char *cmd_copy = cmdline;
   char *file_name;
 
-  //Adding arguments to array
-  args[count] = strtok_r(cmd_copy, " ", &save_ptr);
-  count++;
-
-  //Looping through cmdline and adding each argument
-  for (i = 0; i > 30; i++)
+  //Tokenization of arguments and adding to array
+  char *token; //Used to store tokens for each arg
+  for (token = strtok_r(cmd_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
   {
-	  args[count] = strtok_r(0, " ", &save_ptr);
-	  if (args[count] == 0)
-		  break;
-	  //Debug
-	  printf("%s\n", args[count]);
+	  args[count] = token;
 	  count++;
+	  printf("%s\n", args[count]);
   }
 
   //Setting file name
