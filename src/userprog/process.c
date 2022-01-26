@@ -89,7 +89,7 @@ start_process (void *proc_)
   //If successfully loaded add arguments to the stack and update stack
   if (success)
   {
-	printf("File loaded successfully!");
+	printf("File loaded successfully!"); //Debugging
   }
   
   //Free the memory page holding the tokens now they have been passed to stack
@@ -124,11 +124,12 @@ process_wait (tid_t child_tid)
     //Structures and variables
     int exit_code = 0;
     
-    struct thread *th = thread_current();
+    struct thread *th = thread_current(); //Finding current thread
     
+    //Setting exit code
     exit_code = th->exit_code;
 
-    return exit_code;
+    return exit_code; //Return
 }
 
 /* Free the current process's resources. */
