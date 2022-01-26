@@ -581,7 +581,7 @@ static bool setup_stack (void **esp, int argc, char *args[])
 {
   uint8_t *kpage;
   bool success = false;
-  int sSize = 0; //Variable to store the current size of the stack
+  //int sSize = 0; //Variable to store the current size of the stack (debug)
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -599,14 +599,43 @@ static bool setup_stack (void **esp, int argc, char *args[])
 	*esp -= (strlen(args[i - 1]) + 1) * sizeof(char); //decrease the stack pointer by arglen
 	strlcpy(*esp, args[i - 1], strlen(args[i - 1]) + 1); //storing arg in current esp
 	argv[i - 1] = (uint32_t*) *esp; //Storing arg location in argv array
-	sSize += (strlen(args[i - 1]) + 1) * sizeof(char);
+	//sSize += (strlen(args[i - 1]) + 1) * sizeof(char);
 	}
 
 	//Word align/rounding to nearest 4 byte chunk of memory
 	int align = (size_t) *esp % 4;
 	*esp -= align; //Take align amount of stack pointer to reach start of chunk
 	memset(*esp, 0, align); //Fill memory at stack pointer
-	sSize =+ align; //Accumulate stack size variable
+	//sSize =+ align; //Accumulate stack size variable
+
+	//Adding last chunk of 0 to indicate end of args
+	*esp -= sizeof(int*); //Making space for 0s
+	(*(int*)(*esp)) = 0; //Setting the chunk to 0s
+	//sSize += sizeof(int*);
+
+	//Making space for and storing locations on stack
+	for (int n = argc; n > 0; n--)
+	{
+		*esp = *esp - sizeof(uint32_t**); //Creates space for arg location
+		memcpy(*esp, &argv[n - 1], sizeof(uint32_t*)); //copying location
+		//sSize += sizeof(uint32_t**);
+	}
+
+	//Adding starting points of the arguments
+	void **argStart = *esp; //This stores the start point of args
+	*esp -= sizeof(void**); //Decrement pointer to make space for start point
+	memcpy(*esp, &argStart, sizeof(void**)); //Copy start point into pointer loc
+	//sSize += sizeof(void**);
+
+	//Adding argument count to the stack
+	*esp -= sizeof(int); //Decrementing pointer to create space for argc
+	memcpy(*esp, &argc, sizeof(int)); //Copying argc into pointer location
+	//sSize =+ sizeof(int);
+
+	//Adding return address to the stack
+	*esp -= sizeof(void*); //Decrementing pointer to create space for ret addr
+	memset(*esp, 0, sizeof(void*)); //Storing return addr in pointer location
+	//sSize += sizeof(void*);
 	} 
 	else 
 	{
