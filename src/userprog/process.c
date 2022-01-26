@@ -44,7 +44,7 @@ struct process
 //Functions
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-static void push_args (const char *[], int count, void **esp);
+//static void push_args (const char *[], int count, void **esp);
 void update_load_status (struct thread *child, enum load_status status);
 struct process *get_child (struct thread *, tid_t);
 
@@ -130,26 +130,8 @@ start_process (void *proc_)
   struct thread *th = thread_current();
   char *cmdline = (char*) proc->cmdline;
   char *filename = proc->filename; //Sets filename to one stored in process struct
-  char *token; //Stores each arg token used to push args to stack
-  char *save_ptr; //Used for strtok_r function
-  int count = 0; //Used to store argc
-
-  //Argument tokenization
-  const char **argtoks = (const char**) palloc_get_page(0);
-
-  //Check we have memory for the argument array
-  if (argtoks == NULL)
-  {
-	  printf("Command line failed");
-	  thread_exit();
-  }
-
-  //Looping through arguments and saving into array
-  for (token = strtok_r(cmdline, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
-  {
-	  count++;
-	  argtoks[count] = token;
-  }
+  //char *token; //Stores each arg token used to push args to stack
+  //char *save_ptr; //Used for strtok_r function
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -158,7 +140,7 @@ start_process (void *proc_)
   if_.eflags = FLAG_IF | FLAG_MBS;
 
   //Load the file
-  success = load (filename, &if_.eip, &if_.esp);
+  success = load (cmdline, &if_.eip, &if_.esp);
 
   //If successfully loaded add arguments to the stack and update stack
   if (success)
@@ -168,14 +150,10 @@ start_process (void *proc_)
 	
 	//Sets the loaded filename for the current thread
 	th->filename = filename;
-	
-	//Add arguments to the stack passing the array of tokenized arguments,
-	//the amount of arguments and the current stack pointer
-	push_args (argtoks, count, &if_.esp);
   }
   
   //Free the memory page holding the tokens now they have been passed to stack
-  palloc_free_page(argtoks);
+  palloc_free_page(cmdline);
 
   /* If load failed, quit. */
   if (!success) 
@@ -252,7 +230,7 @@ process_exit (void)
   if (cur->exit_code == NULL)
 	  cur->exit_code = -1;
 
-  if (cur->exit_code = -1)
+  if (cur->exit_code == -1)
 	  printf("Exit code not set");
   
   //Print the name and exit_code of the process that exits
@@ -339,7 +317,8 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+//Setup stack now passes argument count and args array
+static bool setup_stack (void **esp, int count, char *args[]);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -349,8 +328,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
-bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+
+bool load (const char *cmdline, void (**eip) (void), void **esp) 
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -358,6 +337,29 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false; //Stores true if the executable successfully loads
   int i; //Counter
+  char *args[30];
+  int count = 0; //Stores argument count
+  char *save_ptr;
+  char *cmd_copy = cmdline;
+  char *file_name;
+
+  //Adding arguments to array
+  args[count] = strtok_r(cmd_copy, " ", &save_ptr);
+  count++;
+
+  //Looping through cmdline and adding each argument
+  for (i = 0; i > 30; i++)
+  {
+	  args[count] = strtok_r(0, " ", &save_ptr);
+	  if (args[count] == 0)
+		  break;
+	  //Debug
+	  printf("%s\n", args[count]);
+	  count++;
+  }
+
+  //Setting file name
+  file_name = args[0];
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -448,7 +450,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, count, args))
     goto done;
 
   /* Start address. */
@@ -574,21 +576,42 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-static bool
-setup_stack (void **esp) 
+//Setup stack receives the current esp the argument count and an array of args
+static bool setup_stack (void **esp, int argc, char *args[]) 
 {
   uint8_t *kpage;
   bool success = false;
+  int sSize = 0; //Variable to store the current size of the stack
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
-    {
+    
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success) {
+      if (success) 
+	{
         *esp = PHYS_BASE;
-      } else
+	//Stack management
+	uint32_t argv[argc]; //Stores the address pointers to args
+
+	//Looping through args and setting stack pointer to to each arg
+	for (int i = argc; i > 0; i--)
+	{
+	*esp -= (strlen(args[i - 1]) + 1) * sizeof(char); //decrease the stack pointer by arglen
+	strlcpy(*esp, args[i - 1], strlen(args[i - 1]) + 1); //storing arg in current esp
+	argv[i - 1] = (uint32_t*) *esp; //Storing arg location in argv array
+	sSize += (strlen(args[i - 1]) + 1) * sizeof(char);
+	}
+
+	//Word align/rounding to nearest 4 byte chunk of memory
+	int align = (size_t) *esp % 4;
+	*esp -= align; //Take align amount of stack pointer to reach start of chunk
+	memset(*esp, 0, align); //Fill memory at stack pointer
+	sSize =+ align; //Accumulate stack size variable
+	} 
+	else 
+	{
         palloc_free_page (kpage);
-    }
+	}
   return success;
 }
 
@@ -654,55 +677,3 @@ struct process *get_child (struct thread *th, tid_t child_tid)
 	//If we cannot find the child return NULL
 	return NULL;
 }
-
-//Argument/stack handling
-static void push_args (const char *argtoks[], int argc, void **esp)
-{
-	//Make sure the argument count given is above zero
-	ASSERT(argc > 0);
-
-	//Declare variables
-	int i = 0;
-	int length = 0;
-	void* argvs[argc];
-
-	//Loop through the array of arguments and decrement the stack pointer
-	//also adding the pointer locations of each to the argv array
-	for (i = 0; i < argc; i++)
-	{
-		//set length to the length of argument i
-		length = strlen(argtoks[i]) + 1;
-
-		//decrement stack pointer by length
-		*esp -= length;
-
-		memcpy(*esp, argtoks[i], length);
-
-		//add the pointer location to the argv array
-		argvs[i] = *esp;
-	}
-
-	//Loop through the argv array backwards and set the stack pointer to the
-	//address held in the array
-	for (i = argc - 1; i >= 0; i--)
-	{
-		//Set stack pointer to start of next chunk
-		*esp -= 4;
-
-		//Set esp to address of argument held in argvs array
-		*((void**) *esp) = argvs[i];
-	}
-
-	//Adding argument count to the stack
-	//Go to next memory chunk
-	*esp -= 4;
-	//Set the value at stack pointer to argc
-	*((int*) *esp) = argc;
-
-	//Adding return address to stack
-	//Go to next chunk
-	*esp -= 4;
-	//Set the value at the stack pointer to 0 to indicate return
-	*((int*) *esp) = 0;
-}
-
